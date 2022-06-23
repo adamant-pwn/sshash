@@ -38,6 +38,26 @@ void parse_file(std::istream& is, parse_data& data, build_configuration const& b
     uint64_t num_bases = 0;
     bool glue = false;
 
+    std::vector<uint64_t> positions_distr1(k - m + 1, 0);
+    std::vector<uint64_t> positions_distr2(k - m + 1, 0);
+    std::vector<uint64_t> cardinalities_distr(k - m + 1 + 1, 0);
+
+    /* left-right-max */
+    uint64_t kmers_in_lr_skms = 0;
+    uint64_t num_lr_skms = 0;
+
+    /* right-max */
+    uint64_t kmers_in_r_skms = 0;
+    uint64_t num_r_skms = 0;
+
+    /* left-max */
+    uint64_t kmers_in_l_skms = 0;
+    uint64_t num_l_skms = 0;
+
+    /* non-max (all others) */
+    uint64_t kmers_in_all_other_skms = 0;
+    uint64_t num_all_other_skms = 0;
+
     auto append_super_kmer = [&]() {
         if (sequence.empty() or prev_minimizer == constants::invalid or begin == end) return;
 
@@ -46,8 +66,63 @@ void parse_file(std::istream& is, parse_data& data, build_configuration const& b
         uint64_t size = (end - begin) + k - 1;
         assert(util::is_valid(super_kmer, size));
 
+        // std::cout << std::string(super_kmer, size) << '\n';
+        // for (uint64_t i = 0; i != size - k + 1; ++i) {
+        //     char const* kmer = super_kmer + i;
+        //     uint64_t uint64_kmer = util::string_to_uint64_no_reverse(kmer, k);
+        //     auto [minimizer, pos] = util::compute_minimizer_pos(uint64_kmer, k, m, seed);
+        //     std::cout << util::uint64_to_string_no_reverse(minimizer, m) << ' ';
+        //     std::cout << pos << '\n';
+        // }
+        // std::cout << '\n';
+
         /* if num_kmers_in_super_kmer > k - m + 1, then split the super_kmer into blocks */
         uint64_t num_kmers_in_super_kmer = end - begin;
+
+        uint64_t uint64_first_kmer = util::string_to_uint64_no_reverse(super_kmer, k);
+        auto [minimizer_first_kmer, pos_of_first_kmer_in_skm] =
+            util::compute_minimizer_pos(uint64_first_kmer, k, m, seed);
+        (void)minimizer_first_kmer;
+        assert(pos_of_first_kmer_in_skm <= k - m);
+
+        uint64_t uint64_last_kmer =
+            util::string_to_uint64_no_reverse(super_kmer + num_kmers_in_super_kmer - 1, k);
+        auto [minimizer_last_kmer, pos_of_last_kmer_in_skm] =
+            util::compute_minimizer_pos(uint64_last_kmer, k, m, seed);
+        (void)minimizer_last_kmer;
+
+        positions_distr1[pos_of_first_kmer_in_skm] += 1;  // pos of min in first kmer
+        positions_distr2[pos_of_last_kmer_in_skm] += 1;   // pos of min in last kmer
+
+        if (num_kmers_in_super_kmer <= k - m + 1) {
+            cardinalities_distr[num_kmers_in_super_kmer] += 1;
+
+            if (pos_of_first_kmer_in_skm == k - m and pos_of_last_kmer_in_skm == 0) {
+                /* left-right-max */
+                assert(num_kmers_in_super_kmer == k - m + 1);
+                kmers_in_lr_skms += num_kmers_in_super_kmer;
+                num_lr_skms += 1;
+            } else if (pos_of_first_kmer_in_skm == k - m) {
+                /* right-max */
+                assert(pos_of_last_kmer_in_skm != 0);
+                kmers_in_r_skms += num_kmers_in_super_kmer;
+                num_r_skms += 1;
+            } else if (pos_of_last_kmer_in_skm == 0) {
+                /* left-max */
+                assert(pos_of_first_kmer_in_skm != k - m);
+                kmers_in_l_skms += num_kmers_in_super_kmer;
+                num_l_skms += 1;
+            } else {
+                /* non-max */
+                assert(pos_of_first_kmer_in_skm != k - m);
+                assert(pos_of_last_kmer_in_skm != 0);
+                kmers_in_all_other_skms += num_kmers_in_super_kmer;
+                num_all_other_skms += 1;
+            }
+        } else {
+            // pathological cases where num_kmers_in_super_kmer > k - m + 1 are rare...
+        }
+
         uint64_t num_blocks = num_kmers_in_super_kmer / max_num_kmers_in_super_kmer +
                               (num_kmers_in_super_kmer % max_num_kmers_in_super_kmer != 0);
         assert(num_blocks > 0);
@@ -199,6 +274,46 @@ void parse_file(std::istream& is, parse_data& data, build_configuration const& b
         data.weights_builder.push_weight_interval(weight_value, weight_length);
         data.weights_builder.finalize(data.num_kmers);
     }
+
+    std::cout << "positions_distr1:\n";
+    for (uint64_t i = 0; i != k - m + 1; ++i) {
+        std::cout << "% of first km in skms whose min appears at pos " << i << ": "
+                  << (positions_distr1[i] * 100.0) / data.strings.num_super_kmers() << '\n';
+    }
+    std::cout << "positions_distr2:\n";
+    for (uint64_t i = 0; i != k - m + 1; ++i) {
+        std::cout << "% of last km in skms whose min appears at pos " << i << ": "
+                  << (positions_distr2[i] * 100.0) / data.strings.num_super_kmers() << '\n';
+    }
+    std::cout << "cardinalities_distr:\n";
+    for (uint64_t i = 0; i != k - m + 1 + 1; ++i) {
+        if (i == 0) continue;
+        std::cout << "% of skms that contain " << i
+                  << " kmers: " << (cardinalities_distr[i] * 100.0) / data.strings.num_super_kmers()
+                  << " (" << (cardinalities_distr[i] * i * 100.0) / data.num_kmers
+                  << "% of total kmers)" << '\n';
+    }
+
+    std::cout << "kmers_in_lr_skms = " << kmers_in_lr_skms << "/" << data.num_kmers << "("
+              << (kmers_in_lr_skms * 100.0) / data.num_kmers << "%)" << std::endl;
+    std::cout << "num_lr_skms = " << num_lr_skms << "/" << data.strings.num_super_kmers() << "("
+              << (num_lr_skms * 100.0) / data.strings.num_super_kmers() << "%)" << std::endl;
+
+    std::cout << "kmers_in_r_skms = " << kmers_in_r_skms << "/" << data.num_kmers << "("
+              << (kmers_in_r_skms * 100.0) / data.num_kmers << "%)" << std::endl;
+    std::cout << "num_r_skms = " << num_r_skms << "/" << data.strings.num_super_kmers() << "("
+              << (num_r_skms * 100.0) / data.strings.num_super_kmers() << "%)" << std::endl;
+
+    std::cout << "kmers_in_l_skms = " << kmers_in_l_skms << "/" << data.num_kmers << "("
+              << (kmers_in_l_skms * 100.0) / data.num_kmers << "%)" << std::endl;
+    std::cout << "num_l_skms = " << num_l_skms << "/" << data.strings.num_super_kmers() << "("
+              << (num_l_skms * 100.0) / data.strings.num_super_kmers() << "%)" << std::endl;
+
+    std::cout << "kmers_in_all_other_skms = " << kmers_in_all_other_skms << "/" << data.num_kmers
+              << "(" << (kmers_in_all_other_skms * 100.0) / data.num_kmers << "%)" << std::endl;
+    std::cout << "num_all_other_skms = " << num_all_other_skms << "/"
+              << data.strings.num_super_kmers() << "("
+              << (num_all_other_skms * 100.0) / data.strings.num_super_kmers() << "%)" << std::endl;
 }
 
 parse_data parse_file(std::string const& filename, build_configuration const& build_config) {
