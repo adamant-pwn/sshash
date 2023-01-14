@@ -9,8 +9,11 @@
 
 namespace sshash {
 
+// typedef uint64_t kmer_t;
+typedef __uint128_t kmer_t;
+
 namespace constants {
-constexpr uint64_t max_k = 31;  // max *odd* size that can be packed into 64 bits
+constexpr uint64_t max_k = sizeof(kmer_t) * 4 - 1;  // max *odd* size
 constexpr uint64_t invalid = uint64_t(-1);
 constexpr uint64_t seed = 1;
 constexpr uint64_t hashcode_bits = 64;
@@ -296,7 +299,7 @@ char uint64_to_char(uint64_t x) {
     then also id(g) < id(t).
 */
 uint64_t string_to_uint64(char const* str, uint64_t k) {
-    assert(k <= 32);
+    assert(k <= constants::max_k);
     uint64_t x = 0;
     for (uint64_t i = 0; i != k; ++i) {
         x <<= 2;
@@ -305,7 +308,7 @@ uint64_t string_to_uint64(char const* str, uint64_t k) {
     return x;
 }
 void uint64_to_string(uint64_t x, char* str, uint64_t k) {
-    assert(k <= 32);
+    assert(k <= constants::max_k);
     for (int i = k - 1; i >= 0; --i) {
         str[i] = uint64_to_char(x & 3);
         x >>= 2;
@@ -313,31 +316,34 @@ void uint64_to_string(uint64_t x, char* str, uint64_t k) {
 }
 /****************************************************************************/
 
-std::string uint64_to_string(uint64_t x, uint64_t k) {
-    assert(k <= 32);
+std::string uint64_to_string(kmer_t x, uint64_t k) {
+    assert(k <= constants::max_k);
     std::string str;
     str.resize(k);
     uint64_to_string(x, str.data(), k);
     return str;
 }
 
-uint64_t string_to_uint64_no_reverse(char const* str, uint64_t k) {
-    assert(k <= 32);
-    uint64_t x = 0;
-    for (uint64_t i = 0; i != k; ++i) x += char_to_uint64(str[i]) << (2 * i);
+kmer_t string_to_uint64_no_reverse(char const* str, uint64_t k) {
+    assert(k <= constants::max_k);
+    kmer_t x = 0;
+    for (uint64_t i = 0; i != k; ++i) {
+        kmer_t val = char_to_uint64(str[i]);
+        x += val << (2 * i);
+    }
     return x;
 }
 
-void uint64_to_string_no_reverse(uint64_t x, char* str, uint64_t k) {
-    assert(k <= 32);
+void uint64_to_string_no_reverse(kmer_t x, char* str, uint64_t k) {
+    assert(k <= constants::max_k);
     for (uint64_t i = 0; i != k; ++i) {
         str[i] = uint64_to_char(x & 3);
         x >>= 2;
     }
 }
 
-std::string uint64_to_string_no_reverse(uint64_t x, uint64_t k) {
-    assert(k <= 32);
+std::string uint64_to_string_no_reverse(kmer_t x, uint64_t k) {
+    assert(k <= constants::max_k);
     std::string str;
     str.resize(k);
     uint64_to_string_no_reverse(x, str.data(), k);
@@ -502,17 +508,22 @@ struct murmurhash2_64 {
     static inline uint64_t hash(uint64_t val, uint64_t seed) {
         return MurmurHash2_64(reinterpret_cast<char const*>(&val), sizeof(val), seed);
     }
+
+    // specialization for kmer_t
+    static inline uint64_t hash(kmer_t val, uint64_t seed) {
+        return MurmurHash2_64(reinterpret_cast<char const*>(&val), sizeof(val), seed);
+    }
 };
 
 template <typename Hasher = murmurhash2_64>
-uint64_t compute_minimizer(uint64_t kmer, uint64_t k, uint64_t m, uint64_t seed) {
+kmer_t compute_minimizer(kmer_t kmer, uint64_t k, uint64_t m, uint64_t seed) {
     assert(m < 32);
     assert(m <= k);
     uint64_t min_hash = uint64_t(-1);
-    uint64_t minimizer = uint64_t(-1);
-    uint64_t mask = (uint64_t(1) << (2 * m)) - 1;
+    kmer_t minimizer = kmer_t(-1);
+    kmer_t mask = (kmer_t(1) << (2 * m)) - 1;
     for (uint64_t i = 0; i != k - m + 1; ++i) {
-        uint64_t sub_kmer = kmer & mask;
+        kmer_t sub_kmer = kmer & mask;
         uint64_t hash = Hasher::hash(sub_kmer, seed);
         if (hash < min_hash) {
             min_hash = hash;
@@ -525,16 +536,16 @@ uint64_t compute_minimizer(uint64_t kmer, uint64_t k, uint64_t m, uint64_t seed)
 
 /* not used: just for debug */
 template <typename Hasher = murmurhash2_64>
-std::pair<uint64_t, uint64_t> compute_minimizer_pos(uint64_t kmer, uint64_t k, uint64_t m,
-                                                    uint64_t seed) {
+std::pair<kmer_t, uint64_t> compute_minimizer_pos(kmer_t kmer, uint64_t k, uint64_t m,
+                                                  uint64_t seed) {
     assert(m < 32);
     assert(m <= k);
     uint64_t min_hash = uint64_t(-1);
-    uint64_t minimizer = uint64_t(-1);
-    uint64_t mask = (uint64_t(1) << (2 * m)) - 1;
+    kmer_t minimizer = kmer_t(-1);
+    kmer_t mask = (kmer_t(1) << (2 * m)) - 1;
     uint64_t pos = 0;
     for (uint64_t i = 0; i != k - m + 1; ++i) {
-        uint64_t sub_kmer = kmer & mask;
+        kmer_t sub_kmer = kmer & mask;
         uint64_t hash = Hasher::hash(sub_kmer, seed);
         if (hash < min_hash) {
             min_hash = hash;
