@@ -494,19 +494,16 @@ struct byte_range {
 };
 
 struct murmurhash2_64 {
-    // generic range of bytes
-    static inline uint64_t hash(byte_range range, uint64_t seed) {
-        return MurmurHash2_64(range.begin, range.end - range.begin, seed);
-    }
-
-    // // specialization for std::string
-    // static inline uint64_t hash(std::string const& val, uint64_t seed) {
-    //     return MurmurHash2_64(val.data(), val.size(), seed);
-    // }
-
-    // specialization for kmer_t
+    /* specialization for kmer_t */
     static inline uint64_t hash(kmer_t val, uint64_t seed) {
-        return MurmurHash2_64(reinterpret_cast<char const*>(&val), sizeof(val), seed);
+        if constexpr (sizeof(val) == sizeof(uint64_t)) {
+            return MurmurHash2_64(reinterpret_cast<char const*>(&val), sizeof(val), seed);
+        } else {
+            uint64_t low = static_cast<uint64_t>(val);
+            uint64_t high = static_cast<uint64_t>(val >> 64);
+            return MurmurHash2_64(reinterpret_cast<char const*>(&low), sizeof(uint64_t), seed) ^
+                   MurmurHash2_64(reinterpret_cast<char const*>(&high), sizeof(uint64_t), seed);
+        }
     }
 };
 
