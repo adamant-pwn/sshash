@@ -124,6 +124,29 @@ void parse_file(std::istream& is, parse_data& data, build_configuration const& b
             // pathological cases where num_kmers_in_super_kmer > k - m + 1 should be rare if m is
             // sufficiently large...
             num_skms_with_repeated_minimizer += 1;
+
+            // if (pos_of_min_in_first_kmer_of_skm == k - m and pos_of_min_in_last_kmer_of_skm == 0)
+            // {
+            //     /* left-right-max */
+            //     kmers_in_lr_skms += num_kmers_in_super_kmer;
+            //     num_lr_skms += 1;
+            // } else if (pos_of_min_in_first_kmer_of_skm == k - m) {
+            //     /* right-max */
+            //     assert(pos_of_min_in_last_kmer_of_skm != 0);
+            //     kmers_in_r_skms += num_kmers_in_super_kmer;
+            //     num_r_skms += 1;
+            // } else if (pos_of_min_in_last_kmer_of_skm == 0) {
+            //     /* left-max */
+            //     assert(pos_of_min_in_first_kmer_of_skm != k - m);
+            //     kmers_in_l_skms += num_kmers_in_super_kmer;
+            //     num_l_skms += 1;
+            // } else {
+            //     /* non-max */
+            //     assert(pos_of_min_in_first_kmer_of_skm != k - m);
+            //     assert(pos_of_min_in_last_kmer_of_skm != 0);
+            //     kmers_in_all_other_skms += num_kmers_in_super_kmer;
+            //     num_all_other_skms += 1;
+            // }
         }
 
         uint64_t num_blocks = num_kmers_in_super_kmer / max_num_kmers_in_super_kmer +
