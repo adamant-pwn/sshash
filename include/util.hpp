@@ -504,11 +504,6 @@ struct murmurhash2_64 {
     //     return MurmurHash2_64(val.data(), val.size(), seed);
     // }
 
-    // specialization for uint64_t
-    static inline uint64_t hash(uint64_t val, uint64_t seed) {
-        return MurmurHash2_64(reinterpret_cast<char const*>(&val), sizeof(val), seed);
-    }
-
     // specialization for kmer_t
     static inline uint64_t hash(kmer_t val, uint64_t seed) {
         return MurmurHash2_64(reinterpret_cast<char const*>(&val), sizeof(val), seed);
