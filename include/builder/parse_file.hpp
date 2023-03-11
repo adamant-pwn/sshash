@@ -13,11 +13,10 @@ struct parse_data {
 };
 
 void parse_file(std::istream& is, parse_data& data, build_configuration const& build_config) {
-    uint64_t k = build_config.k;
-    uint64_t m = build_config.m;
-    uint64_t seed = build_config.seed;
-    uint64_t max_num_kmers_in_super_kmer = k - m + 1;
-    uint64_t block_size = 2 * k - m;  // max_num_kmers_in_super_kmer + k - 1
+    const uint64_t k = build_config.k;
+    const uint64_t m = build_config.m;
+    const uint64_t seed = build_config.seed;
+    const uint64_t max_num_kmers_in_super_kmer = k - m + 1;
 
     if (max_num_kmers_in_super_kmer >= (1ULL << (sizeof(num_kmers_in_super_kmer_uint_type) * 8))) {
         throw std::runtime_error(
@@ -44,31 +43,19 @@ void parse_file(std::istream& is, parse_data& data, build_configuration const& b
         if (sequence.empty() or prev_minimizer == constants::invalid_uint64 or begin == end) {
             return;
         }
-
         assert(end > begin);
         char const* super_kmer = sequence.data() + begin;
         uint64_t size = (end - begin) + k - 1;
         assert(util::is_valid(super_kmer, size));
-
-        /* if num_kmers_in_super_kmer > k - m + 1, then split the super_kmer into blocks */
         uint64_t num_kmers_in_super_kmer = end - begin;
-        uint64_t num_blocks = num_kmers_in_super_kmer / max_num_kmers_in_super_kmer +
-                              (num_kmers_in_super_kmer % max_num_kmers_in_super_kmer != 0);
-        assert(num_blocks == 1);
-        for (uint64_t i = 0; i != num_blocks; ++i) {
-            uint64_t n = block_size;
-            if (i == num_blocks - 1) n = size;
-            uint64_t num_kmers_in_block = n - k + 1;
-            assert(num_kmers_in_block <= max_num_kmers_in_super_kmer);
-            data.minimizers.emplace_back(prev_minimizer, builder.offset, num_kmers_in_block);
-            builder.append(super_kmer + i * max_num_kmers_in_super_kmer, n, glue);
-            if (glue) {
-                assert(data.minimizers.back().offset > k - 1);
-                data.minimizers.back().offset -= k - 1;
-            }
-            size -= max_num_kmers_in_super_kmer;
-            glue = true;
+        assert(num_kmers_in_super_kmer <= max_num_kmers_in_super_kmer);
+        data.minimizers.emplace_back(prev_minimizer, builder.offset, num_kmers_in_super_kmer);
+        builder.append(super_kmer, size, glue);
+        if (glue) {
+            assert(data.minimizers.back().offset > k - 1);
+            data.minimizers.back().offset -= k - 1;
         }
+        glue = true;
     };
 
     uint64_t seq_len = 0;
