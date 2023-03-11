@@ -3,10 +3,10 @@
 namespace sshash {
 
 lookup_result dictionary::lookup_uint_regular_parsing(kmer_t uint_kmer) const {
-    uint64_t minimizer = util::compute_minimizer(uint_kmer, m_k, m_m, m_seed);
+    auto [minimizer, minimizer_pos] = util::compute_minimizer_pos(uint_kmer, m_k, m_m, m_seed);
     uint64_t bucket_id = m_minimizers.lookup(minimizer);
 
-    if (m_skew_index.empty()) return m_buckets.lookup(bucket_id, uint_kmer, m_k, m_m);
+    if (m_skew_index.empty()) return m_buckets.lookup(bucket_id, uint_kmer, m_k, minimizer_pos);
 
     auto [begin, end] = m_buckets.locate_bucket(bucket_id);
     uint64_t num_super_kmers_in_bucket = end - begin;
@@ -15,12 +15,12 @@ lookup_result dictionary::lookup_uint_regular_parsing(kmer_t uint_kmer) const {
         uint64_t pos = m_skew_index.lookup(uint_kmer, log2_bucket_size);
         /* It must hold pos < num_super_kmers_in_bucket for the kmer to exist. */
         if (pos < num_super_kmers_in_bucket) {
-            return m_buckets.lookup_in_super_kmer(begin + pos, uint_kmer, m_k, m_m);
+            return m_buckets.lookup_in_super_kmer(begin + pos, uint_kmer, m_k, minimizer_pos);
         }
         return lookup_result();
     }
 
-    return m_buckets.lookup(begin, end, uint_kmer, m_k, m_m);
+    return m_buckets.lookup(begin, end, uint_kmer, m_k, minimizer_pos);
 }
 
 lookup_result dictionary::lookup_uint_canonical_parsing(kmer_t uint_kmer) const {

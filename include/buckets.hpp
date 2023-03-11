@@ -69,15 +69,16 @@ struct buckets {
         return {begin, end};
     }
 
-    lookup_result lookup(uint64_t bucket_id, kmer_t target_kmer, uint64_t k, uint64_t m) const {
+    lookup_result lookup(uint64_t bucket_id, kmer_t target_kmer, uint64_t k,
+                         uint64_t mini_pos_in_target_kmer) const {
         auto [begin, end] = locate_bucket(bucket_id);
-        return lookup(begin, end, target_kmer, k, m);
+        return lookup(begin, end, target_kmer, k, mini_pos_in_target_kmer);
     }
 
     lookup_result lookup(uint64_t begin, uint64_t end, kmer_t target_kmer, uint64_t k,
-                         uint64_t m) const {
+                         uint64_t mini_pos_in_target_kmer) const {
         for (uint64_t super_kmer_id = begin; super_kmer_id != end; ++super_kmer_id) {
-            auto res = lookup_in_super_kmer(super_kmer_id, target_kmer, k, m);
+            auto res = lookup_in_super_kmer(super_kmer_id, target_kmer, k, mini_pos_in_target_kmer);
             if (res.kmer_id != constants::invalid_uint64) {
                 assert(is_valid(res));
                 return res;
@@ -87,18 +88,18 @@ struct buckets {
     }
 
     lookup_result lookup_in_super_kmer(uint64_t super_kmer_id, kmer_t target_kmer, uint64_t k,
-                                       uint64_t m) const {
-        uint64_t offset = offsets.access(super_kmer_id);
-        auto [res, contig_end] = offset_to_id(offset, k);
-        bit_vector_iterator bv_it(strings, 2 * offset);
-        uint64_t window_size = std::min<uint64_t>(k - m + 1, contig_end - offset - k + 1);
-        for (uint64_t w = 0; w != window_size; ++w) {
-            kmer_t read_kmer = bv_it.read_and_advance_by_two(2 * k);
-            if (read_kmer == target_kmer) {
-                res.kmer_id += w;
-                res.kmer_id_in_contig += w;
-                assert(is_valid(res));
-                return res;
+                                       uint64_t mini_pos_in_target_kmer) const {
+        uint64_t mini_pos_in_string = offsets.access(super_kmer_id);
+        if (mini_pos_in_string >= mini_pos_in_target_kmer) {
+            uint64_t offset = mini_pos_in_string - mini_pos_in_target_kmer;
+            auto [res, contig_end] = offset_to_id(offset, k);
+            if (offset + k - 1 < contig_end) {
+                bit_vector_iterator bv_it(strings, 2 * offset);
+                kmer_t read_kmer = bv_it.read(2 * k);
+                if (read_kmer == target_kmer) {
+                    assert(is_valid(res));
+                    return res;
+                }
             }
         }
         return lookup_result();

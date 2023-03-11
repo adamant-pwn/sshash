@@ -218,7 +218,13 @@ buckets_statistics build_index(parse_data& data, minimizers const& m_minimizers,
         uint64_t offset_pos = 0;
         auto list = it.list();
         for (auto [offset, num_kmers_in_super_kmer] : list) {
-            offsets.set(base + offset_pos++, offset);
+            /* update offset of super_kmer to offset of minimizer  */
+            bit_vector_iterator bv_it(data.strings.strings, 2 * offset);
+            kmer_t kmer = bv_it.read(2 * build_config.k);
+            auto [minimizer, pos] = util::compute_minimizer_pos(kmer, build_config.k,
+                                                                build_config.m, build_config.seed);
+            (void)minimizer;
+            offsets.set(base + offset_pos++, offset + pos);
             buckets_stats.add_num_kmers_in_super_kmer(num_super_kmers_in_bucket,
                                                       num_kmers_in_super_kmer);
         }

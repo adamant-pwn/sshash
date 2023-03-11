@@ -54,7 +54,7 @@ void parse_file(std::istream& is, parse_data& data, build_configuration const& b
         uint64_t num_kmers_in_super_kmer = end - begin;
         uint64_t num_blocks = num_kmers_in_super_kmer / max_num_kmers_in_super_kmer +
                               (num_kmers_in_super_kmer % max_num_kmers_in_super_kmer != 0);
-        assert(num_blocks > 0);
+        assert(num_blocks == 1);
         for (uint64_t i = 0; i != num_blocks; ++i) {
             uint64_t n = block_size;
             if (i == num_blocks - 1) n = size;
@@ -150,6 +150,7 @@ void parse_file(std::istream& is, parse_data& data, build_configuration const& b
         end = 0;
         glue = false;  // start a new piece
         prev_minimizer = constants::invalid_uint64;
+        uint64_t prev_pos = constants::invalid_uint64;
         num_bases += sequence.size();
 
         if (build_config.weighted and seq_len != sequence.size()) {
@@ -162,7 +163,7 @@ void parse_file(std::istream& is, parse_data& data, build_configuration const& b
             char const* kmer = sequence.data() + end;
             assert(util::is_valid(kmer, k));
             kmer_t uint_kmer = util::string_to_uint_kmer_no_reverse(kmer, k);
-            uint64_t minimizer = util::compute_minimizer(uint_kmer, k, m, seed);
+            auto [minimizer, pos] = util::compute_minimizer_pos(uint_kmer, k, m, seed);
 
             if (build_config.canonical_parsing) {
                 kmer_t uint_kmer_rc = util::compute_reverse_complement(uint_kmer, k);
@@ -170,8 +171,11 @@ void parse_file(std::istream& is, parse_data& data, build_configuration const& b
                 minimizer = std::min<uint64_t>(minimizer, minimizer_rc);
             }
 
-            if (prev_minimizer == constants::invalid_uint64) prev_minimizer = minimizer;
-            if (minimizer != prev_minimizer) {
+            if (prev_minimizer == constants::invalid_uint64) {
+                prev_minimizer = minimizer;
+                prev_pos = pos + 1;
+            }
+            if (minimizer != prev_minimizer or pos + 1 != prev_pos) {
                 append_super_kmer();
                 begin = end;
                 prev_minimizer = minimizer;
@@ -180,6 +184,7 @@ void parse_file(std::istream& is, parse_data& data, build_configuration const& b
 
             ++data.num_kmers;
             ++end;
+            prev_pos = pos;
         }
 
         append_super_kmer();

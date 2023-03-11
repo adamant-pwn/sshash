@@ -346,7 +346,6 @@ uint64_t compute_minimizer(kmer_t kmer, uint64_t k, uint64_t m, uint64_t seed) {
     return minimizer;
 }
 
-/* used in dump.cpp */
 template <typename Hasher = murmurhash2_64>
 std::pair<uint64_t, uint64_t> compute_minimizer_pos(kmer_t kmer, uint64_t k, uint64_t m,
                                                     uint64_t seed) {
