@@ -207,6 +207,7 @@ buckets_statistics build_index(parse_data& data, minimizers const& m_minimizers,
 
     buckets_statistics buckets_stats(num_buckets, num_kmers, num_super_kmers);
 
+    bit_vector_iterator bv_it(data.strings.strings, 0);
     for (minimizers_tuples_iterator it(input.data(), input.data() + input.size()); it.has_next();
          it.next()) {
         uint64_t bucket_id = m_minimizers.lookup(it.minimizer());
@@ -219,11 +220,20 @@ buckets_statistics build_index(parse_data& data, minimizers const& m_minimizers,
         auto list = it.list();
         for (auto [offset, num_kmers_in_super_kmer] : list) {
             /* update offset of super_kmer to offset of minimizer  */
-            bit_vector_iterator bv_it(data.strings.strings, 2 * offset);
+            bv_it.at(2 * offset);
             kmer_t kmer = bv_it.read(2 * build_config.k);
             auto [minimizer, pos] = util::compute_minimizer_pos(kmer, build_config.k,
                                                                 build_config.m, build_config.seed);
-            (void)minimizer;
+            if (build_config.canonical_parsing) {
+                kmer_t kmer_rc = util::compute_reverse_complement(kmer, build_config.k);
+                auto [minimizer_rc, pos_rc] = util::compute_minimizer_pos(
+                    kmer_rc, build_config.k, build_config.m, build_config.seed);
+                if (minimizer_rc < minimizer) {
+                    assert(build_config.k >= pos_rc + build_config.m);
+                    pos = build_config.k - (pos_rc + build_config.m);
+                }
+            }
+
             offsets.set(base + offset_pos++, offset + pos);
             buckets_stats.add_num_kmers_in_super_kmer(num_super_kmers_in_bucket,
                                                       num_kmers_in_super_kmer);

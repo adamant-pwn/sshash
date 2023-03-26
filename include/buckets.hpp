@@ -105,39 +105,39 @@ struct buckets {
         return lookup_result();
     }
 
-    lookup_result lookup_canonical(uint64_t bucket_id, kmer_t target_kmer, kmer_t target_kmer_rc,
-                                   uint64_t k, uint64_t m) const {
-        auto [begin, end] = locate_bucket(bucket_id);
-        return lookup_canonical(begin, end, target_kmer, target_kmer_rc, k, m);
-    }
+    // lookup_result lookup_canonical(uint64_t bucket_id, kmer_t target_kmer, kmer_t target_kmer_rc,
+    //                                uint64_t k, uint64_t m) const {
+    //     auto [begin, end] = locate_bucket(bucket_id);
+    //     return lookup_canonical(begin, end, target_kmer, target_kmer_rc, k, m);
+    // }
 
-    lookup_result lookup_canonical(uint64_t begin, uint64_t end, kmer_t target_kmer,
-                                   kmer_t target_kmer_rc, uint64_t k, uint64_t m) const {
-        for (uint64_t super_kmer_id = begin; super_kmer_id != end; ++super_kmer_id) {
-            uint64_t offset = offsets.access(super_kmer_id);
-            auto [res, contig_end] = offset_to_id(offset, k);
-            bit_vector_iterator bv_it(strings, 2 * offset);
-            uint64_t window_size = std::min<uint64_t>(k - m + 1, contig_end - offset - k + 1);
-            for (uint64_t w = 0; w != window_size; ++w) {
-                kmer_t read_kmer = bv_it.read_and_advance_by_two(2 * k);
-                if (read_kmer == target_kmer) {
-                    res.kmer_id += w;
-                    res.kmer_id_in_contig += w;
-                    res.kmer_orientation = constants::forward_orientation;
-                    assert(is_valid(res));
-                    return res;
-                }
-                if (read_kmer == target_kmer_rc) {
-                    res.kmer_id += w;
-                    res.kmer_id_in_contig += w;
-                    res.kmer_orientation = constants::backward_orientation;
-                    assert(is_valid(res));
-                    return res;
-                }
-            }
-        }
-        return lookup_result();
-    }
+    // lookup_result lookup_canonical(uint64_t begin, uint64_t end, kmer_t target_kmer,
+    //                                kmer_t target_kmer_rc, uint64_t k, uint64_t m) const {
+    //     for (uint64_t super_kmer_id = begin; super_kmer_id != end; ++super_kmer_id) {
+    //         uint64_t offset = offsets.access(super_kmer_id);
+    //         auto [res, contig_end] = offset_to_id(offset, k);
+    //         bit_vector_iterator bv_it(strings, 2 * offset);
+    //         uint64_t window_size = std::min<uint64_t>(k - m + 1, contig_end - offset - k + 1);
+    //         for (uint64_t w = 0; w != window_size; ++w) {
+    //             kmer_t read_kmer = bv_it.read_and_advance_by_two(2 * k);
+    //             if (read_kmer == target_kmer) {
+    //                 res.kmer_id += w;
+    //                 res.kmer_id_in_contig += w;
+    //                 res.kmer_orientation = constants::forward_orientation;
+    //                 assert(is_valid(res));
+    //                 return res;
+    //             }
+    //             if (read_kmer == target_kmer_rc) {
+    //                 res.kmer_id += w;
+    //                 res.kmer_id_in_contig += w;
+    //                 res.kmer_orientation = constants::backward_orientation;
+    //                 assert(is_valid(res));
+    //                 return res;
+    //             }
+    //         }
+    //     }
+    //     return lookup_result();
+    // }
 
     uint64_t id_to_offset(uint64_t id, uint64_t k) const {
         constexpr uint64_t linear_scan_threshold = 8;

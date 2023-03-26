@@ -154,8 +154,12 @@ void parse_file(std::istream& is, parse_data& data, build_configuration const& b
 
             if (build_config.canonical_parsing) {
                 kmer_t uint_kmer_rc = util::compute_reverse_complement(uint_kmer, k);
-                uint64_t minimizer_rc = util::compute_minimizer(uint_kmer_rc, k, m, seed);
-                minimizer = std::min<uint64_t>(minimizer, minimizer_rc);
+                auto [minimizer_rc, pos_rc] = util::compute_minimizer_pos(uint_kmer_rc, k, m, seed);
+                if (minimizer_rc < minimizer) {
+                    minimizer = minimizer_rc;
+                    assert(k >= pos_rc + m);
+                    pos = k - (pos_rc + m);
+                }
             }
 
             if (prev_minimizer == constants::invalid_uint64) {

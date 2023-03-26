@@ -142,7 +142,6 @@ bool check_correctness_lookup_access(std::istream& is, dictionary const& dict) {
         }
     }
     std::cout << "checked " << num_kmers << " kmers" << std::endl;
-
     std::cout << "EVERYTHING OK!" << std::endl;
 
     std::cout << "checking correctness of negative lookup with random kmers..." << std::endl;
@@ -158,8 +157,8 @@ bool check_correctness_lookup_access(std::istream& is, dictionary const& dict) {
             std::cout << "kmer '" << got_kmer_str << "' found!" << std::endl;
         }
     }
-
     std::cout << "EVERYTHING OK!" << std::endl;
+
     return true;
 }
 

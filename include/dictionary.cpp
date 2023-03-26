@@ -25,34 +25,72 @@ lookup_result dictionary::lookup_uint_regular_parsing(kmer_t uint_kmer) const {
 
 lookup_result dictionary::lookup_uint_canonical_parsing(kmer_t uint_kmer) const {
     kmer_t uint_kmer_rc = util::compute_reverse_complement(uint_kmer, m_k);
-    uint64_t minimizer = util::compute_minimizer(uint_kmer, m_k, m_m, m_seed);
-    uint64_t minimizer_rc = util::compute_minimizer(uint_kmer_rc, m_k, m_m, m_seed);
+    auto [minimizer, minimizer_pos] = util::compute_minimizer_pos(uint_kmer, m_k, m_m, m_seed);
+    auto [minimizer_rc, minimizer_pos_rc] =
+        util::compute_minimizer_pos(uint_kmer_rc, m_k, m_m, m_seed);
+
     uint64_t bucket_id = m_minimizers.lookup(std::min<uint64_t>(minimizer, minimizer_rc));
 
     if (m_skew_index.empty()) {
-        return m_buckets.lookup_canonical(bucket_id, uint_kmer, uint_kmer_rc, m_k, m_m);
-    }
+        if (minimizer_rc < minimizer) {  // minimizer_rc is min
+            // remap pos of minimizer_rc into kmer
 
-    auto [begin, end] = m_buckets.locate_bucket(bucket_id);
-    uint64_t num_super_kmers_in_bucket = end - begin;
-    uint64_t log2_bucket_size = util::ceil_log2_uint32(num_super_kmers_in_bucket);
-    if (log2_bucket_size > m_skew_index.min_log2) {
-        uint64_t pos = m_skew_index.lookup(uint_kmer, log2_bucket_size);
-        if (pos < num_super_kmers_in_bucket) {
-            auto res = m_buckets.lookup_in_super_kmer(begin + pos, uint_kmer, m_k, m_m);
+            // case 1: kmer is present
+            auto res = m_buckets.lookup(bucket_id, uint_kmer, m_k, m_k - (minimizer_pos_rc + m_m));
             assert(res.kmer_orientation == constants::forward_orientation);
-            if (res.kmer_id != constants::invalid_uint64) return res;
-        }
-        uint64_t pos_rc = m_skew_index.lookup(uint_kmer_rc, log2_bucket_size);
-        if (pos_rc < num_super_kmers_in_bucket) {
-            auto res = m_buckets.lookup_in_super_kmer(begin + pos_rc, uint_kmer_rc, m_k, m_m);
+            if (res.kmer_id != constants::invalid_uint64) { return res; }
+
+            // case 1.1: kmer_rc present
+            res = m_buckets.lookup(bucket_id, uint_kmer_rc, m_k, minimizer_pos_rc);
             res.kmer_orientation = constants::backward_orientation;
-            return res;
+            if (res.kmer_id != constants::invalid_uint64) { return res; }
+
+        } else {  // minimizer is min
+            // remap pos of minimizer into kmer_rc
+
+            // case 2: kmer is present
+            auto res = m_buckets.lookup(bucket_id, uint_kmer, m_k, minimizer_pos);
+            assert(res.kmer_orientation == constants::forward_orientation);
+            if (res.kmer_id != constants::invalid_uint64) { return res; }
+
+            // case 2.1: kmer_rc present
+            res = m_buckets.lookup(bucket_id, uint_kmer_rc, m_k, m_k - (minimizer_pos + m_m));
+            res.kmer_orientation = constants::backward_orientation;
+            if (res.kmer_id != constants::invalid_uint64) { return res; }
+
+            if (minimizer == minimizer_rc) {  // special case: very rare if m is sufficiently long
+                auto res = m_buckets.lookup(bucket_id, uint_kmer_rc, m_k, minimizer_pos_rc);
+                res.kmer_orientation = constants::backward_orientation;
+                if (res.kmer_id != constants::invalid_uint64) { return res; }
+            }
         }
+
         return lookup_result();
     }
 
-    return m_buckets.lookup_canonical(begin, end, uint_kmer, uint_kmer_rc, m_k, m_m);
+    // auto [begin, end] = m_buckets.locate_bucket(bucket_id);
+    // uint64_t num_super_kmers_in_bucket = end - begin;
+    // uint64_t log2_bucket_size = util::ceil_log2_uint32(num_super_kmers_in_bucket);
+    // if (log2_bucket_size > m_skew_index.min_log2) {
+    //     uint64_t pos = m_skew_index.lookup(uint_kmer, log2_bucket_size);
+    //     if (pos < num_super_kmers_in_bucket) {
+    //         auto res = m_buckets.lookup_in_super_kmer(begin + pos, uint_kmer, m_k,
+    //         minimizer_pos); assert(res.kmer_orientation == constants::forward_orientation); if
+    //         (res.kmer_id != constants::invalid_uint64) return res;
+    //     }
+    //     uint64_t pos_rc = m_skew_index.lookup(uint_kmer_rc, log2_bucket_size);
+    //     if (pos_rc < num_super_kmers_in_bucket) {
+    //         auto res =
+    //             m_buckets.lookup_in_super_kmer(begin + pos_rc, uint_kmer_rc, m_k,
+    //             minimizer_pos_rc);
+    //         res.kmer_orientation = constants::backward_orientation;
+    //         return res;
+    //     }
+    //     return lookup_result();
+    // }
+
+    // // return m_buckets.lookup_canonical(begin, end, uint_kmer, uint_kmer_rc, m_k, m_m);
+    // return m_buckets.lookup(begin, end, kmer, m_k, mini_pos);
 }
 
 uint64_t dictionary::lookup(char const* string_kmer, bool check_reverse_complement) const {
