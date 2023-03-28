@@ -78,31 +78,22 @@ struct streaming_query_regular_parsing {
             return lookup_result();
         }
 
+        /* clang-format off */
         /* 3. compute result */
         if (m_reverse) {
             if (same_minimizer_rc()) {
                 if (!m_minimizer_rc_not_found) {
-                    if (extends_rc()) {
-                        extend_rc();
-                    } else {
-                        lookup_advanced_rc();
-                    }
+                    if (extends_rc()) extend_rc();
+                    else lookup_advanced_rc();
                 }
-            } else {
-                m_res = lookup_result();
-            }
+            } else m_res = lookup_result();
         } else {
             if (same_minimizer()) {
                 if (!m_minimizer_not_found) {
-                    if (extends()) {
-                        extend();
-                    } else {
-                        lookup_advanced();
-                    }
+                    if (extends()) extend();
+                    else lookup_advanced();
                 }
-            } else {
-                m_res = lookup_result();
-            }
+            } else m_res = lookup_result();
         }
         if (!found()) {
             m_minimizer_not_found = false;
@@ -117,6 +108,7 @@ struct streaming_query_regular_parsing {
                 if (!found()) search_rc();
             }
         }
+        /* clang-format on */
 
         /* 4. update state */
         update_state();
@@ -305,6 +297,7 @@ private:
         assert(m_res.kmer_orientation == constants::forward_orientation);
         m_res.kmer_id += 1;
         m_res.kmer_id_in_contig += 1;
+        ++m_num_extensions;
     }
 
     inline void extend_rc() {
@@ -315,24 +308,19 @@ private:
         assert(m_res.kmer_orientation == constants::backward_orientation);
         m_res.kmer_id -= 1;
         m_res.kmer_id_in_contig -= 1;
+        ++m_num_extensions;
     }
 
     inline bool extends() {
         if (m_pos_in_window == m_window_size) return false;
-        if (m_kmer == m_string_iterator.read(2 * m_k)) {
-            ++m_num_extensions;
-            return true;
-        }
+        if (m_kmer == m_string_iterator.read(2 * m_k)) return true;
         return false;
     }
 
     inline bool extends_rc() {
         assert(m_reverse);
         if (m_pos_in_window == 1) return false;
-        if (m_kmer_rc == m_string_iterator.read_reverse(2 * m_k)) {
-            ++m_num_extensions;
-            return true;
-        }
+        if (m_kmer_rc == m_string_iterator.read_reverse(2 * m_k)) return true;
         return false;
     }
 

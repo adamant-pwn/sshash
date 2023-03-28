@@ -223,22 +223,17 @@ private:
             m_res.kmer_id += 1;
             m_res.kmer_id_in_contig += 1;
         }
+        ++m_num_extensions;
     }
 
     inline bool extends() {
         if (m_reverse) {
             if (m_pos_in_window == 1) return false;
-            if (m_kmer_rc == m_string_iterator.read_reverse(2 * m_k)) {
-                ++m_num_extensions;
-                return true;
-            }
+            if (m_kmer_rc == m_string_iterator.read_reverse(2 * m_k)) return true;
             return false;
         }
         if (m_pos_in_window == m_window_size) return false;
-        if (m_kmer == m_string_iterator.read(2 * m_k)) {
-            ++m_num_extensions;
-            return true;
-        }
+        if (m_kmer == m_string_iterator.read(2 * m_k)) return true;
         return false;
     }
 };
