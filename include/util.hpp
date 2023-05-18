@@ -110,6 +110,23 @@ struct build_configuration {
                   << ", canonical_parsing = " << (canonical_parsing ? "true" : "false")
                   << ", weighted = " << (weighted ? "true" : "false") << std::endl;
     }
+
+    void validate() const {
+        if (k == 0) throw std::runtime_error("k must be > 0");
+        if (k > constants::max_k) {
+            throw std::runtime_error("k must be less <= " + std::to_string(constants::max_k) +
+                                     " but got k = " + std::to_string(k));
+        }
+        if (m == 0) throw std::runtime_error("m must be > 0");
+        if (m > constants::max_m) {
+            throw std::runtime_error("m must be less <= " + std::to_string(constants::max_m) +
+                                     " but got m = " + std::to_string(m));
+        }
+        if (m > k) throw std::runtime_error("m must be < k");
+        if (l > constants::max_l) {
+            throw std::runtime_error("l must be <= " + std::to_string(constants::max_l));
+        }
+    }
 };
 
 namespace util {

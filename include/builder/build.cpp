@@ -1,33 +1,59 @@
 #include "../dictionary.hpp"
+#include "../gz/zip_stream.hpp"
 #include "../../external/pthash/external/essentials/include/essentials.hpp"
-#include "util.hpp"
 
-/** build steps **/
-#include "parse_file.hpp"
+#include "util.hpp"
+#include "builder.hpp"
 #include "build_index.hpp"
 #include "build_skew_index.hpp"
-/*****************/
 
 #include <numeric>  // for std::accumulate
 
 namespace sshash {
 
-void dictionary::build(std::string const& filename, build_configuration const& build_config) {
-    /* Validate the build configuration. */
-    if (build_config.k == 0) throw std::runtime_error("k must be > 0");
-    if (build_config.k > constants::max_k) {
-        throw std::runtime_error("k must be less <= " + std::to_string(constants::max_k) +
-                                 " but got k = " + std::to_string(build_config.k));
+void parse_file(std::istream& is, builder& b, build_configuration const& build_config) {
+    for (std::string sequence; !is.eof();) {
+        std::getline(is, sequence);  // header sequence
+        if (build_config.weighted) b.parse_header(sequence.data(), sequence.length());
+        std::getline(is, sequence);  // DNA sequence
+        if (build_config.weighted and sequence.length() != b.expected_sequence_length()) {
+            std::cout << "ERROR: expected a sequence of length " << b.expected_sequence_length()
+                      << " but got one of length " << sequence.length() << std::endl;
+            throw std::runtime_error("file is malformed");
+        }
+        b.add_sequence(sequence.data(), sequence.length());
     }
-    if (build_config.m == 0) throw std::runtime_error("m must be > 0");
-    if (build_config.m > constants::max_m) {
-        throw std::runtime_error("m must be less <= " + std::to_string(constants::max_m) +
-                                 " but got m = " + std::to_string(build_config.m));
+}
+
+void parse_file(std::string const& filename, builder& b, build_configuration const& build_config) {
+    std::ifstream is(filename.c_str());
+    if (!is.good()) throw std::runtime_error("error in opening the file '" + filename + "'");
+    std::cout << "reading file '" << filename << "'..." << std::endl;
+    if (util::ends_with(filename, ".gz")) {
+        zip_istream zis(is);
+        parse_file(zis, b, build_config);
+    } else {
+        parse_file(is, b, build_config);
     }
-    if (build_config.m > build_config.k) throw std::runtime_error("m must be < k");
-    if (build_config.l > constants::max_l) {
-        throw std::runtime_error("l must be <= " + std::to_string(constants::max_l));
-    }
+    is.close();
+}
+
+void dictionary::build_from(builder& b, build_configuration const& build_config) {
+    build_config.validate();
+
+    m_k = build_config.k;
+    m_m = build_config.m;
+    m_seed = build_config.seed;
+    m_canonical_parsing = build_config.canonical_parsing;
+    m_skew_index.min_log2 = build_config.l;
+    m_size = b.data.num_kmers;
+
+    b.finalize();
+    build_from(b.data, build_config);
+}
+
+void dictionary::build_from(std::string const& filename, build_configuration const& build_config) {
+    build_config.validate();
 
     m_k = build_config.k;
     m_m = build_config.m;
@@ -35,19 +61,29 @@ void dictionary::build(std::string const& filename, build_configuration const& b
     m_canonical_parsing = build_config.canonical_parsing;
     m_skew_index.min_log2 = build_config.l;
 
+    /* step 1: parse the input file and build compact string pool ***/
+    essentials::timer_type timer;
+    timer.start();
+    builder b(build_config);
+    parse_file(filename, b, build_config);
+    b.finalize();
+    m_size = b.data.num_kmers;
+    timer.stop();
+    b.data.parse_time = timer.elapsed();
+    /******/
+
+    build_from(b.data, build_config);
+}
+
+void dictionary::build_from(parse_data& data, build_configuration const& build_config) {
     std::vector<double> timings;
     timings.reserve(5);
     essentials::timer_type timer;
 
-    /* step 1: parse the input file and build compact string pool ***/
-    timer.start();
-    parse_data data = parse_file(filename, build_config);
-    m_size = data.num_kmers;
-    timer.stop();
-    timings.push_back(timer.elapsed());
-    print_time(timings.back(), data.num_kmers, "step 1: 'parse_file'");
-    timer.reset();
-    /******/
+    if (data.parse_time) {
+        timings.push_back(data.parse_time);
+        print_time(timings.back(), data.num_kmers, "step 1: 'parse_file'");
+    }
 
     if (build_config.weighted) {
         /* step 1.1: compress weights ***/
@@ -101,8 +137,10 @@ void dictionary::build(std::string const& filename, build_configuration const& b
     timer.reset();
     /******/
 
-    double total_time = std::accumulate(timings.begin(), timings.end(), 0.0);
-    print_time(total_time, data.num_kmers, "total_time");
+    if (data.parse_time) {
+        double total_time = std::accumulate(timings.begin(), timings.end(), 0.0);
+        print_time(total_time, data.num_kmers, "total_time");
+    }
 
     print_space_breakdown();
 

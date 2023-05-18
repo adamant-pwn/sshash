@@ -6,13 +6,15 @@
 #include "skew_index.hpp"
 #include "weights.hpp"
 
+#include "builder/builder.hpp"
+
 namespace sshash {
 
 struct dictionary {
     dictionary() : m_size(0), m_seed(0), m_k(0), m_m(0), m_canonical_parsing(0) {}
 
-    /* Build from input file. */
-    void build(std::string const& input_filename, build_configuration const& build_config);
+    void build_from(std::string const& input_filename, build_configuration const& build_config);
+    void build_from(builder& b, build_configuration const& build_config);
 
     /* Write super-k-mers to output file in FASTA format. */
     void dump(std::string const& output_filename) const;
@@ -120,6 +122,8 @@ private:
     lookup_result lookup_uint_canonical_parsing(kmer_t uint_kmer) const;
     void forward_neighbours(kmer_t suffix, neighbourhood& res) const;
     void backward_neighbours(kmer_t prefix, neighbourhood& res) const;
+
+    void build_from(parse_data& data, build_configuration const& build_config);
 };
 
 }  // namespace sshash

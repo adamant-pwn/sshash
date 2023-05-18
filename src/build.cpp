@@ -70,7 +70,7 @@ int build(int argc, char** argv) {
     }
     build_config.print();
 
-    dict.build(input_filename, build_config);
+    dict.build_from(input_filename, build_config);
     assert(dict.k() == k);
 
     bool check = parser.get<bool>("check");
