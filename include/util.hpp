@@ -347,26 +347,26 @@ private:
             sum += m_weights[shiftmer & 3][i];
             shiftmer >>= 2;
         }
-        if (sum < -0.00000001) {
+        if (sum < -0.00000001) {  // R node
             return false;
-        }  // R node
-
-        else if (sum > 0.00000001) {  // L node - check if it's the first
+        } else if (sum > 0.00000001) {  // L node - check if it's the first
             double shiftsum = compute_shift_sum(mmer);
-            if (shiftsum > 0.00000001) {
+            if (shiftsum > 0.00000001) {  // not the first L node
                 return false;
-            }  // not the first L node
-            else {
+            } else {  // the first L node
                 return true;
-            }     // the first L node
+            }
         } else {  // I node - check if it's an I-cycle and if yes, check if this is the
                   // lexicographically smallest rotation
+
             double shiftsum = compute_shift_sum(mmer);
-            get_array(mmer);
             if (shiftsum > 0.00000001 || shiftsum < -0.00000001) { return false; }  // not all I
             // an I-cycle, check if it's the smallest shift
-            uint64_t i = 0, j = 1;
-            for (; j < m_m; j++) {
+
+            get_array(mmer);
+
+            uint64_t i = 0;
+            for (uint64_t j = 1; j < m_m; j++) {
                 if (m_array[j] < m_array[i]) { return false; }
                 if (m_array[j] > m_array[i]) {
                     i = 0;
@@ -375,7 +375,7 @@ private:
                 }
                 if (i == 0 || i == m_m) { return true; }
             }
-            for (j = 0; j < m_m; j++) {
+            for (uint64_t j = 0; j < m_m; j++) {
                 if (m_array[j] < m_array[i]) { return false; }
                 if (m_array[j] > m_array[i]) {
                     i = 0;
@@ -385,6 +385,7 @@ private:
                 if (i == 0 || i == m_m) { return true; }
             }
         }
+
         return false;
     }
 };
@@ -394,7 +395,7 @@ uint64_t compute_minimizer(kmer_t kmer, uint64_t k, uint64_t m, uint64_t seed) {
     assert(m <= constants::max_m);
     assert(m <= k);
 
-    decycling_minimizer dm(m);
+    static decycling_minimizer dm(m);
 
     uint64_t min_hash = uint64_t(-1);
     uint64_t minimizer = uint64_t(-1);
