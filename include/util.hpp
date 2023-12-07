@@ -3,7 +3,7 @@
 #include <vector>
 #include <cassert>
 #include <fstream>
-#include <cmath>  // for std::ceil on linux
+#include <cmath>  // for std::ceil, std::sin on linux
 
 #include "hash_util.hpp"
 
@@ -288,16 +288,130 @@ static inline bool is_valid(int c) { return canonicalize_basepair_forward_map[c]
     return true;
 }
 
+/*
+    Adapted from https://github.com/OrensteinLab/DecyclingSetBasedMinimizerOrder
+*/
+struct decycling_minimizer {
+    decycling_minimizer(uint64_t m) {
+        m_m = m;
+        m_u = 3.1415926535898 * 2.0 / double(m);
+        m_nondec_mask = uint64_t(1) << 2 * m;
+        m_array.resize(m);
+
+        /* compute weights */
+        for (int j = 0; j < 4; j++) {
+            std::vector<double> jweights;
+            for (int i = m_m - 1; i >= 0; i--) {
+                jweights.push_back(std::sin(i * m_u) * j);  // NOTE: weights is in opposite order
+            }
+            m_weights.push_back(jweights);
+        }
+    }
+
+    template <typename Hasher = murmurhash2_64>
+    uint64_t hash(uint64_t mmer, uint64_t seed) {
+        static const uint64_t rand_hash = Hasher::hash(seed, seed);
+        uint64_t hashed_mmer = mmer ^ rand_hash;
+        if (!is_in_decycling_set(mmer)) hashed_mmer = hashed_mmer | m_nondec_mask;
+        return hashed_mmer;
+    }
+
+private:
+    uint64_t m_m;
+    uint64_t m_nondec_mask;
+    double m_u;
+    std::vector<std::vector<double>> m_weights;
+    std::vector<char> m_array;
+
+    double compute_shift_sum(uint64_t mmer) const {
+        double shiftsum = 0.0;
+        mmer >>= 2;
+        for (uint64_t i = 0; i < m_m - 1; i++) {
+            shiftsum += m_weights[mmer & 3][i];
+            mmer >>= 2;
+        }
+        return shiftsum;
+    }
+
+    void get_array(uint64_t mmer) {
+        for (int i = m_m - 1; i >= 0; i--) {
+            m_array[i] = mmer & 3;
+            mmer >>= 2;
+        }
+    }
+
+    bool is_in_decycling_set(uint64_t mmer) {
+        double sum = 0.0;
+        uint64_t shiftmer = mmer;
+        for (uint64_t i = 0; i < m_m - 1; i++) {
+            sum += m_weights[shiftmer & 3][i];
+            shiftmer >>= 2;
+        }
+        if (sum < -0.00000001) {
+            return false;
+        }  // R node
+
+        else if (sum > 0.00000001) {  // L node - check if it's the first
+            double shiftsum = compute_shift_sum(mmer);
+            if (shiftsum > 0.00000001) {
+                return false;
+            }  // not the first L node
+            else {
+                return true;
+            }     // the first L node
+        } else {  // I node - check if it's an I-cycle and if yes, check if this is the
+                  // lexicographically smallest rotation
+            double shiftsum = compute_shift_sum(mmer);
+            get_array(mmer);
+            if (shiftsum > 0.00000001 || shiftsum < -0.00000001) { return false; }  // not all I
+            // an I-cycle, check if it's the smallest shift
+            uint64_t i = 0, j = 1;
+            for (; j < m_m; j++) {
+                if (m_array[j] < m_array[i]) { return false; }
+                if (m_array[j] > m_array[i]) {
+                    i = 0;
+                } else {
+                    i++;
+                }
+                if (i == 0 || i == m_m) { return true; }
+            }
+            for (j = 0; j < m_m; j++) {
+                if (m_array[j] < m_array[i]) { return false; }
+                if (m_array[j] > m_array[i]) {
+                    i = 0;
+                } else {
+                    i++;
+                }
+                if (i == 0 || i == m_m) { return true; }
+            }
+        }
+        return false;
+    }
+};
+
 template <typename Hasher = murmurhash2_64>
 uint64_t compute_minimizer(kmer_t kmer, uint64_t k, uint64_t m, uint64_t seed) {
     assert(m <= constants::max_m);
     assert(m <= k);
+
+    decycling_minimizer dm(m);
+
     uint64_t min_hash = uint64_t(-1);
     uint64_t minimizer = uint64_t(-1);
     kmer_t mask = (kmer_t(1) << (2 * m)) - 1;
     for (uint64_t i = 0; i != k - m + 1; ++i) {
         uint64_t mmer = static_cast<uint64_t>(kmer & mask);
-        uint64_t hash = Hasher::hash(mmer, seed);
+
+        // opt. 1
+        // static const uint64_t rand_hash = Hasher::hash(seed, seed);
+        // uint64_t hash = mmer ^ rand_hash;
+
+        // opt. 2
+        // uint64_t hash = Hasher::hash(mmer, seed);
+
+        // opt. 3
+        uint64_t hash = dm.hash<Hasher>(mmer, seed);
+
         if (hash < min_hash) {
             min_hash = hash;
             minimizer = mmer;
