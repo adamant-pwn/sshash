@@ -10,7 +10,7 @@ My adaptation is in `include/util.hpp`.
 
 These new orders can be used as drop-in replacements for the random minimizer order currently used in SSHash. If an order induces lower density, then SSHash maintains less minimizers and longer (on average) super-kmers, thus improving space usage.
 
-A small example for E. Coli (seed is 1 by default):
+A small example for E. Coli (seed is `1` by default):
 
 	./sshash build -i ../data/unitigs_stitched/with_weights/ecoli_sakai.ust.k31.fa.gz -k 31 -m 13
 
@@ -29,8 +29,8 @@ Using seed `1234567890`:
 gives the following results.
 
 - Random order: `4.77997 [bits/kmer]` (`489522` minimizers and `526050` super-kmers)
-- Decycling: `4.66423 [bits/kmer]` (`461927` minimizers and `504579` super-kmers)
-- Double-Decycling: `4.66423 [bits/kmer]` (`461927` minimizers and `504579` super-kmers)
+- Decycling: `4.66425 [bits/kmer]` (`461927` minimizers and `504579` super-kmers)
+- Double-Decycling: `4.66425 [bits/kmer]` (`461927` minimizers and `504579` super-kmers)
 
 So, a minor improvement. It seems the decycling-set based method is very susceptible to the seed, which is rather strange.
 
@@ -51,9 +51,9 @@ For a whole yeast genome:
 
 we have the following numbers.
 
-- Random order: `5.26637 [bits/kmer]` (`1257282` minimizers and `1288199` super-kmers)
-- Decycling: `5.37412 [bits/kmer]` (`1326252` minimizers and `1358643` super-kmers)
-- Double-Decycling: `5.37412 [bits/kmer]` (`1326252` minimizers and `1358643` super-kmers)
+- Random order: `5.20371 [bits/kmer]` (`1257282` minimizers and `1288199` super-kmers)
+- Decycling: `5.37477 [bits/kmer]` (`1326252` minimizers and `1358643` super-kmers)
+- Double-Decycling: `5.37477 [bits/kmer]` (`1326252` minimizers and `1358643` super-kmers)
 
 Using seed `0`:
 
