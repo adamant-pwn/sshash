@@ -316,7 +316,7 @@ struct decycling_minimizer {
         return hashed_mmer;
     }
 
-private:
+protected:
     uint64_t m_m;
     uint64_t m_nondec_mask;
     double m_u;
@@ -390,12 +390,77 @@ private:
     }
 };
 
+struct double_decycling_minimizer : public decycling_minimizer {
+    double_decycling_minimizer(uint64_t m) : decycling_minimizer(m) {
+        nondec_mask = uint64_t(1) << (2 * m + 1);
+        symdec_mask = uint64_t(1) << 2 * m;
+    }
+
+    template <typename Hasher = murmurhash2_64>
+    uint64_t hash(uint64_t mmer, uint64_t seed) {
+        static const uint64_t rand_hash = Hasher::hash(seed, seed);
+        uint64_t hashed_mmer = mmer ^ rand_hash;
+        int ret = is_in_double_decycling_set(mmer);
+        if (ret == 0) {
+            hashed_mmer = hashed_mmer | nondec_mask;
+        } else if (ret == 1) {  // in the symmetric set
+            hashed_mmer = hashed_mmer | symdec_mask;
+        }
+        return hashed_mmer;
+    }
+
+private:
+    uint64_t symdec_mask;
+    uint64_t nondec_mask;
+
+    int is_in_double_decycling_set(uint64_t mmer) {
+        double sum = 0.0;
+        uint64_t shiftmer = mmer;
+        for (uint64_t i = 0; i < m_m - 1; i++) {
+            sum += m_weights[shiftmer & 3][i];
+            shiftmer >>= 2;
+        }
+        double shiftsum = compute_shift_sum(mmer);
+        if (sum > 0.00000001 && shiftsum < 0.00000001) { return 2; }    // the first L node
+        if (sum < -0.00000001 && shiftsum > -0.00000001) { return 1; }  // the first R node
+        if ((sum < 0.00000001 && sum > -0.00000001) &&
+            (shiftsum < 0.00000001 &&
+             shiftsum > -0.00000001)) {  // an I-cycle, check if it's the lexicographically smallest
+                                         // rotation
+
+            get_array(mmer);
+
+            uint64_t i = 0;
+            for (uint64_t j = 1; j < m_m; j++) {
+                if (m_array[j] < m_array[i]) { return 0; }
+                if (m_array[j] > m_array[i]) {
+                    i = 0;
+                } else {
+                    i++;
+                }
+                if (i == 0 || i == m_m) { return 2; }
+            }
+            for (uint64_t j = 0; j < m_m; j++) {
+                if (m_array[j] < m_array[i]) { return 0; }
+                if (m_array[j] > m_array[i]) {
+                    i = 0;
+                } else {
+                    i++;
+                }
+                if (i == 0 || i == m_m) { return 2; }
+            }
+        }
+        return 0;
+    }
+};
+
 template <typename Hasher = murmurhash2_64>
 uint64_t compute_minimizer(kmer_t kmer, uint64_t k, uint64_t m, uint64_t seed) {
     assert(m <= constants::max_m);
     assert(m <= k);
 
-    static decycling_minimizer dm(m);
+    // static decycling_minimizer dm(m);
+    // static double_decycling_minimizer bdm(m);
 
     uint64_t min_hash = uint64_t(-1);
     uint64_t minimizer = uint64_t(-1);
@@ -408,10 +473,13 @@ uint64_t compute_minimizer(kmer_t kmer, uint64_t k, uint64_t m, uint64_t seed) {
         // uint64_t hash = mmer ^ rand_hash;
 
         // opt. 2
-        // uint64_t hash = Hasher::hash(mmer, seed);
+        uint64_t hash = Hasher::hash(mmer, seed);
 
         // opt. 3
-        uint64_t hash = dm.hash<Hasher>(mmer, seed);
+        // uint64_t hash = dm.hash<Hasher>(mmer, seed);
+
+        // opt. 4
+        // uint64_t hash = bdm.hash<Hasher>(mmer, seed);
 
         if (hash < min_hash) {
             min_hash = hash;
