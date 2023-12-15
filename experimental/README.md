@@ -28,7 +28,7 @@ Using seed `1234567890`:
 
 gives the following results.
 
-- Random order: `4.83112 [bits/kmer]` (`489522` minimizers and `526050` super-kmers)
+- Random order: `4.77997 [bits/kmer]` (`489522` minimizers and `526050` super-kmers)
 - Decycling: `4.66423 [bits/kmer]` (`461927` minimizers and `504579` super-kmers)
 - Double-Decycling: `4.66423 [bits/kmer]` (`461927` minimizers and `504579` super-kmers)
 
